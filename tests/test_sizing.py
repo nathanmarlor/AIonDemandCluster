@@ -1,6 +1,8 @@
 from aiod.sizing import (
     ModelSpec,
     _params_from_name,
+    auto_context_for_offer,
+    context_for_vram,
     estimate_vram,
     parse_repo_id,
     plan_gpus,
@@ -68,3 +70,27 @@ def test_small_model_fits_one_gpu():
     _, _, req = estimate_vram(spec, "bf16", context_tokens=8192)
     opts = {o.tier.name: o for o in plan_gpus(req)}
     assert opts["A100 80GB"].num_gpus == 1
+
+
+def test_context_for_vram_scales_with_kv_quant():
+    # q4_0 KV is ~0.27x f16, so the same VRAM buys ~3.7x the tokens.
+    f16 = context_for_vram(16.0, None)
+    q4 = context_for_vram(16.0, "q4_0")
+    assert f16 == 16384  # 16 GB / 8 GB-per-8k * 8192
+    assert q4 > f16 * 3
+    assert context_for_vram(0.0) == 0
+
+
+def test_auto_context_fills_offer_vram():
+    # Tight box: weights 342.7 GB on a 392 GB box leaves little for f16 KV,
+    # but q4_0 stretches it well past the f16 result.
+    f16 = auto_context_for_offer(392.0, 342.7, None)
+    q4 = auto_context_for_offer(392.0, 342.7, "q4_0")
+    assert q4 > f16 > 0
+    assert f16 % 4096 == 0 and q4 % 4096 == 0  # rounded to multiple
+
+
+def test_auto_context_clamps_to_cap_and_floor():
+    # Huge box -> cap; box that can't even hold weights -> floor.
+    assert auto_context_for_offer(2000.0, 342.7, "q4_0") == 262144
+    assert auto_context_for_offer(350.0, 342.7, None) == 8192
