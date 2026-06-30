@@ -216,7 +216,7 @@ class VastClient:
         return inst
 
     def list_instances(self) -> list[dict]:
-        data = self._get("/api/v0/instances/")
+        data = self._get("/api/v1/instances/")
         inst = data.get("instances", [])
         return inst if isinstance(inst, list) else [inst]
 

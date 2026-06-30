@@ -67,7 +67,7 @@ def validate_vast_key(key: str, timeout: float = 15.0) -> tuple[bool, str]:
         return False, "no key provided"
     try:
         r = httpx.get(
-            "https://console.vast.ai/api/v0/instances/",
+            "https://console.vast.ai/api/v1/instances/",
             headers={"Authorization": f"Bearer {key}"},
             timeout=timeout,
         )
